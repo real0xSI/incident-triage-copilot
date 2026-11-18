@@ -1,0 +1,23 @@
+{
+  "dependencies": {
+    "@forge/api": "8.5.0",
+    "@forge/bridge": "7.3.0",
+    "@forge/kvs": "^2.1.2",
+    "@forge/react": "12.5.0",
+    "@forge/resolver": "2.0.2"
+  },
+  "description": "Forge app for Codegeist 2026: triages new Jira / JSM incidents with a Rovo agent, MCP tools, and Teamwork Graph context. Human approves every triage; nothing is ever auto-assigned.",
+  "devDependencies": {
+    "@forge/cli": "15.1.0",
+    "esbuild": "^0.25.0",
+    "js-yaml": "5.5.0"
+  },
+  "license": "MIT",
+  "name": "incident-triage-copilot",
+  "private": false,
+  "scripts": {
+    "lint": "./node_modules/.bin/forge lint",
+    "test": "node --test test/triage.test.js test/graph.test.js test/actions.test.js test/manifest.test.js test/modules.test.js test/trigger.test.js test/jira.test.js"
+  },
+  "version": "1.0.0"
+}
