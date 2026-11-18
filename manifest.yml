@@ -1,0 +1,163 @@
+modules:
+  jira:issuePanel:
+    - key: triage-copilot-panel
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: Triage Copilot
+      icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
+  trigger:
+    - key: incident-created-trigger
+      function: trigger-handler
+      events:
+        - avi:jira:created:issue
+  rovo:agent:
+    - key: triage-copilot-agent
+      name: Triage Copilot
+      description: Triages new Jira incidents, finds similar past incidents and the
+        people who fixed them, and drafts a triage summary for a human to
+        approve.
+      prompt: resource:agent-prompt;agent-prompt.md
+      conversationStarters:
+        - Triage the newest incident
+        - Who should own this incident?
+        - Find incidents like this one
+      actions:
+        - triage-incident
+        - find-similar-incidents
+        - suggest-assignee
+        - apply-triage
+      skills:
+        - incident-triage
+  rovo:skill:
+    - key: incident-triage
+      source:
+        dir: skills/incident-triage
+      dependencies:
+        tools:
+          - triage-incident
+          - find-similar-incidents
+          - suggest-assignee
+  rovo:mcp:
+    - key: triage-copilot-mcp
+      name: Triage Copilot MCP
+      tools:
+        - triage-incident
+        - find-similar-incidents
+        - suggest-assignee
+  action:
+    - key: triage-incident
+      name: Triage an incident
+      function: triage-action
+      actionVerb: GET
+      description: >
+        Runs the deterministic triage engine on a Jira issue and returns a draft
+        triage summary, a suggested priority, a confidence score, and the
+        evidence behind it. Read-only; it never changes the issue.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key to triage, for example SUP-123.
+    - key: find-similar-incidents
+      name: Find similar incidents
+      function: similar-action
+      actionVerb: GET
+      description: >
+        Finds past incidents similar to the given issue by text similarity and
+        by Teamwork Graph relationships, and returns them ranked with their
+        resolutions. Read-only.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key to compare against past incidents.
+        limit:
+          title: Result limit
+          type: number
+          required: false
+          description: Maximum number of similar incidents to return (default 5).
+    - key: suggest-assignee
+      name: Suggest an assignee
+      function: assignee-action
+      actionVerb: GET
+      description: >
+        Suggests who should own an incident, ranked by who resolved similar
+        incidents and who last touched the related service or component in the
+        Teamwork Graph. A suggestion only; it never assigns anyone.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key to find an owner for.
+    - key: apply-triage
+      name: Apply approved triage
+      function: apply-action
+      actionVerb: UPDATE
+      description: >
+        Applies a human-approved triage to an issue: posts the triage summary as
+        a comment, sets the priority, and assigns the chosen owner. Requires the
+        human to confirm first; the UPDATE verb makes Rovo ask for confirmation.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key to apply the triage to.
+        priority:
+          title: Priority
+          type: string
+          required: true
+          description: Priority to set. One of Highest, High, Medium, Low, Lowest.
+        assigneeAccountId:
+          title: Assignee account ID
+          type: string
+          required: false
+          description: Atlassian account ID of the owner to assign. Omit to leave the
+            assignee unchanged.
+        commentBody:
+          title: Triage comment
+          type: string
+          required: true
+          description: The triage summary text to post as a comment.
+        confirm:
+          title: Confirm
+          type: boolean
+          required: true
+          description: Must be true. The human applying the triage has reviewed it.
+  function:
+    - key: resolver
+      handler: resolvers.handler
+    - key: triage-action
+      handler: actions.triageIncident
+    - key: similar-action
+      handler: actions.findSimilarIncidents
+    - key: assignee-action
+      handler: actions.suggestAssignee
+    - key: apply-action
+      handler: actions.applyTriage
+    - key: trigger-handler
+      handler: trigger.onIssueCreated
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+  - key: agent-prompt
+    path: prompts
+permissions:
+  scopes:
+    - storage:app
+    - read:jira-work
+    - write:jira-work
+    - read:servicedesk-request
+    - read:graph:issue:jira
+    - read:graph:user:atlassian
+    - read:graph:team:atlassian
+    - read:graph:page:confluence
+app:
+  runtime:
+    name: nodejs24.x
+  id: ari:cloud:ecosystem::app/ff8f7ca2-ffc6-498c-b6d8-d0f4083fcf0b
